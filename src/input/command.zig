@@ -657,6 +657,12 @@ fn actionCommands(action: Action.Key) []const Command {
             .description = "Check for updates to the application.",
         }},
 
+        .toggle_theme => comptime &.{.{
+            .action = .toggle_theme,
+            .title = "Toggle Light/Dark Theme",
+            .description = "Toggle between light and dark theme variants.",
+        }},
+
         .undo => comptime &.{.{
             .action = .undo,
             .title = "Undo",

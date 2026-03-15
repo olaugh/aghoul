@@ -449,6 +449,18 @@ pub fn performAction(
         .toggle_quick_terminal => _ = try rt_app.performAction(.app, .toggle_quick_terminal, {}),
         .toggle_visibility => _ = try rt_app.performAction(.app, .toggle_visibility, {}),
         .check_for_updates => _ = try rt_app.performAction(.app, .check_for_updates, {}),
+        .toggle_theme => {
+            const new_scheme: apprt.ColorScheme = switch (self.config_conditional_state.theme) {
+                .light => .dark,
+                .dark => .light,
+            };
+            try self.colorSchemeEvent(rt_app, new_scheme);
+            for (self.surfaces.items) |surface| {
+                surface.core().colorSchemeCallback(new_scheme) catch |err| {
+                    log.warn("error toggling theme on surface err={}", .{err});
+                };
+            }
+        },
         .show_gtk_inspector => _ = try rt_app.performAction(.app, .show_gtk_inspector, {}),
         .undo => _ = try rt_app.performAction(.app, .undo, {}),
 

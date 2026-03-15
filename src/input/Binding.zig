@@ -833,6 +833,14 @@ pub const Action = union(enum) {
     /// Only implemented on macOS.
     check_for_updates,
 
+    /// Toggle between light and dark themes.
+    ///
+    /// Switches between the light and dark theme variants configured
+    /// via the `theme` configuration (e.g. `theme = light:X,dark:Y`).
+    /// This is internal to Ghostty and does not change the OS
+    /// appearance setting.
+    toggle_theme,
+
     /// Undo the last undoable action for the focused surface or terminal,
     /// if possible. This can undo actions such as closing tabs or
     /// windows.
@@ -1303,6 +1311,7 @@ pub const Action = union(enum) {
             .toggle_quick_terminal,
             .toggle_visibility,
             .check_for_updates,
+            .toggle_theme,
             .show_gtk_inspector,
             => .app,
 
