@@ -1676,7 +1676,7 @@ fn updateScrollbar(self: *Surface, scrollbar: terminal.Scrollbar) void {
 
 /// This should be called anytime `config_conditional_state` changes
 /// so that the apprt can reload the configuration.
-fn notifyConfigConditionalState(self: *Surface) void {
+pub fn notifyConfigConditionalState(self: *Surface) void {
     _ = self.rt_app.performAction(
         .{ .surface = self },
         .reload_config,
@@ -5055,6 +5055,17 @@ pub fn colorSchemeCallback(self: *Surface, scheme: apprt.ColorScheme) !void {
 
     // If our scheme didn't change, then we don't do anything.
     if (self.config_conditional_state.theme == new_scheme) return;
+
+    // If the user has manually toggled the theme, ignore system
+    // appearance changes so we don't override their choice.
+    // Re-assert the current theme state instead.
+    if (self.app.theme_override) {
+        if (self.config_conditional_state.theme != self.app.config_conditional_state.theme) {
+            self.config_conditional_state.theme = self.app.config_conditional_state.theme;
+            self.notifyConfigConditionalState();
+        }
+        return;
+    }
 
     // Setup our conditional state which has the current color theme.
     self.config_conditional_state.theme = new_scheme;

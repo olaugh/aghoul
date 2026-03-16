@@ -64,6 +64,10 @@ last_notification_digest: u64 = 0,
 /// to the app-level config and as a default for new surfaces.
 config_conditional_state: configpkg.ConditionalState,
 
+/// When true, the theme was manually toggled by the user via toggle_theme
+/// and system appearance changes should not override it.
+theme_override: bool = false,
+
 /// Set to false once we've created at least one surface. This
 /// never goes true again. This can be used by surfaces to determine
 /// if they are the first surface.
@@ -418,6 +422,10 @@ pub fn colorSchemeEvent(
     // If our scheme didn't change, then we don't do anything.
     if (self.config_conditional_state.theme == new_scheme) return;
 
+    // If the user has manually toggled the theme, ignore system
+    // appearance changes so we don't override their choice.
+    if (self.theme_override) return;
+
     // Setup our conditional state which has the current color theme.
     self.config_conditional_state.theme = new_scheme;
 
@@ -450,15 +458,23 @@ pub fn performAction(
         .toggle_visibility => _ = try rt_app.performAction(.app, .toggle_visibility, {}),
         .check_for_updates => _ = try rt_app.performAction(.app, .check_for_updates, {}),
         .toggle_theme => {
-            const new_scheme: apprt.ColorScheme = switch (self.config_conditional_state.theme) {
+            const new_theme: configpkg.ConditionalState.Theme = switch (self.config_conditional_state.theme) {
                 .light => .dark,
                 .dark => .light,
             };
-            try self.colorSchemeEvent(rt_app, new_scheme);
+
+            // Mark that the user has overridden the theme so that
+            // system appearance callbacks don't reset it.
+            self.theme_override = true;
+
+            // Update app-level conditional state.
+            self.config_conditional_state.theme = new_theme;
+
+            // Update all surfaces and trigger per-surface reload.
             for (self.surfaces.items) |surface| {
-                surface.core().colorSchemeCallback(new_scheme) catch |err| {
-                    log.warn("error toggling theme on surface err={}", .{err});
-                };
+                const core = surface.core();
+                core.config_conditional_state.theme = new_theme;
+                core.notifyConfigConditionalState();
             }
         },
         .show_gtk_inspector => _ = try rt_app.performAction(.app, .show_gtk_inspector, {}),
