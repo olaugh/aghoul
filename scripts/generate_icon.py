@@ -251,8 +251,8 @@ def generate_icon():
     for c in range(3):
         canvas[:, :, c] = canvas[:, :, c] * (1 - bezel_frame_mask * 0.8) + bezel_color[c] * bezel_frame_mask * 0.8
 
-    green_outer_rect = rounded_rect_mask(size, corner_radius - 16, border + 20)
-    green_inner_rect = rounded_rect_mask(size, corner_radius - 22, border + 26)
+    green_outer_rect = rounded_rect_mask(size, corner_radius - 12, border + 16)
+    green_inner_rect = rounded_rect_mask(size, corner_radius - 36, border + 40)
     green_border_mask = np.clip(green_outer_rect - green_inner_rect, 0, 1)
 
     # Smooth perimeter-based dimming — no hard cuts, just gentle brightness waves
