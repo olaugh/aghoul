@@ -141,6 +141,9 @@ config_conditional_state: configpkg.ConditionalState,
 /// and system appearance changes should not override it for this surface.
 theme_override: bool = false,
 
+/// The current color tint index. 0 = default (no tint), 1-6 = hued backgrounds.
+color_tint_index: u4 = 0,
+
 /// This is set to true if our IO thread notifies us our child exited.
 /// This is used to determine if we need to confirm, hold open, etc.
 child_exited: bool = false,
@@ -1678,6 +1681,55 @@ fn updateScrollbar(self: *Surface, scrollbar: terminal.Scrollbar) void {
     };
 }
 
+const ColorTint = struct {
+    bg: configpkg.Config.Color,
+    fg: configpkg.Config.Color,
+};
+
+/// Background/foreground tint pairs for dark theme (indices 1-6).
+/// Each tint has a subtle hue with a complementary foreground shift.
+const dark_tints = [6]ColorTint{
+    // Midnight Blue
+    .{ .bg = .{ .r = 20, .g = 26, .b = 46 }, .fg = .{ .r = 255, .g = 253, .b = 246 } },
+    // Forest
+    .{ .bg = .{ .r = 20, .g = 38, .b = 26 }, .fg = .{ .r = 254, .g = 249, .b = 254 } },
+    // Plum
+    .{ .bg = .{ .r = 34, .g = 22, .b = 44 }, .fg = .{ .r = 249, .g = 255, .b = 249 } },
+    // Rosewood
+    .{ .bg = .{ .r = 44, .g = 22, .b = 28 }, .fg = .{ .r = 246, .g = 253, .b = 255 } },
+    // Teal
+    .{ .bg = .{ .r = 18, .g = 34, .b = 40 }, .fg = .{ .r = 255, .g = 251, .b = 246 } },
+    // Bronze
+    .{ .bg = .{ .r = 42, .g = 35, .b = 20 }, .fg = .{ .r = 246, .g = 249, .b = 255 } },
+};
+
+/// Background/foreground tint pairs for light theme (indices 1-6).
+const light_tints = [6]ColorTint{
+    // Sky
+    .{ .bg = .{ .r = 230, .g = 240, .b = 255 }, .fg = .{ .r = 12, .g = 10, .b = 5 } },
+    // Mint
+    .{ .bg = .{ .r = 230, .g = 250, .b = 236 }, .fg = .{ .r = 10, .g = 5, .b = 12 } },
+    // Lavender
+    .{ .bg = .{ .r = 242, .g = 230, .b = 255 }, .fg = .{ .r = 8, .g = 12, .b = 5 } },
+    // Blush
+    .{ .bg = .{ .r = 255, .g = 230, .b = 238 }, .fg = .{ .r = 5, .g = 10, .b = 12 } },
+    // Aqua
+    .{ .bg = .{ .r = 228, .g = 246, .b = 250 }, .fg = .{ .r = 12, .g = 8, .b = 5 } },
+    // Cream
+    .{ .bg = .{ .r = 255, .g = 246, .b = 228 }, .fg = .{ .r = 5, .g = 8, .b = 12 } },
+};
+
+/// Returns the color tint for the current tint index and theme,
+/// or null if the default colors should be used (index 0).
+fn getColorTint(self: *const Surface) ?ColorTint {
+    if (self.color_tint_index == 0) return null;
+    const idx = self.color_tint_index - 1;
+    return switch (self.config_conditional_state.theme) {
+        .dark => dark_tints[idx],
+        .light => light_tints[idx],
+    };
+}
+
 /// This should be called anytime `config_conditional_state` changes
 /// so that the apprt can reload the configuration.
 pub fn notifyConfigConditionalState(self: *Surface) void {
@@ -1768,6 +1820,12 @@ pub fn updateConfig(
     termio_config_ptr.* = try termio.Termio.DerivedConfig.init(self.alloc, config);
     errdefer termio_config_ptr.deinit();
 
+    // Apply color tint if active
+    if (self.getColorTint()) |tint| {
+        termio_config_ptr.background = tint.bg;
+        termio_config_ptr.foreground = tint.fg;
+    }
+
     _ = self.renderer_thread.mailbox.push(renderer_message, .{ .forever = {} });
     self.queueIo(.{
         .change_config = .{
@@ -1795,6 +1853,22 @@ pub fn updateConfig(
         .config_change,
         .{ .config = config },
     );
+
+    // Notify apprt of the actual background color (with tint applied)
+    // so the title bar stays in sync.
+    {
+        const bg = if (self.getColorTint()) |tint| tint.bg else config.background;
+        _ = try self.rt_app.performAction(
+            .{ .surface = self },
+            .color_change,
+            .{
+                .kind = .background,
+                .r = bg.r,
+                .g = bg.g,
+                .b = bg.b,
+            },
+        );
+    }
 }
 
 const InitialSizeError = error{
@@ -5792,6 +5866,11 @@ pub fn performBindingAction(self: *Surface, action: input.Binding.Action) !bool 
             };
             self.theme_override = true;
             self.config_conditional_state.theme = new_theme;
+            self.notifyConfigConditionalState();
+        },
+
+        .cycle_color_tint => {
+            self.color_tint_index = (self.color_tint_index + 1) % 7;
             self.notifyConfigConditionalState();
         },
 

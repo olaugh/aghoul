@@ -663,6 +663,12 @@ fn actionCommands(action: Action.Key) []const Command {
             .description = "Toggle between light and dark theme variants.",
         }},
 
+        .cycle_color_tint => comptime &.{.{
+            .action = .cycle_color_tint,
+            .title = "Cycle Background Color Tint",
+            .description = "Cycle through the default background and 6 subtle color tints.",
+        }},
+
         .undo => comptime &.{.{
             .action = .undo,
             .title = "Undo",

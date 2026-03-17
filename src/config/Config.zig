@@ -6425,6 +6425,13 @@ pub const Keybinds = struct {
             .{ .open_config = {} },
         );
 
+        // Cycle background color tint
+        try self.set.put(
+            alloc,
+            .{ .key = .{ .unicode = 'k' }, .mods = .{ .ctrl = true, .shift = true } },
+            .cycle_color_tint,
+        );
+
         {
             try self.set.put(
                 alloc,

@@ -841,6 +841,14 @@ pub const Action = union(enum) {
     /// appearance setting.
     toggle_theme,
 
+    /// Cycle through background color tints.
+    ///
+    /// Cycles the terminal background through the default color and
+    /// 6 subtle hues that complement the current light or dark theme.
+    /// The foreground color is slightly adjusted for each tint to
+    /// maintain optimal readability.
+    cycle_color_tint,
+
     /// Undo the last undoable action for the focused surface or terminal,
     /// if possible. This can undo actions such as closing tabs or
     /// windows.
@@ -1371,6 +1379,7 @@ pub const Action = union(enum) {
             .toggle_command_palette,
             .toggle_background_opacity,
             .toggle_theme,
+            .cycle_color_tint,
             .show_on_screen_keyboard,
             .reset_window_size,
             .activate_key_table,
