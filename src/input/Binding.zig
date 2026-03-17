@@ -1311,7 +1311,6 @@ pub const Action = union(enum) {
             .toggle_quick_terminal,
             .toggle_visibility,
             .check_for_updates,
-            .toggle_theme,
             .show_gtk_inspector,
             => .app,
 
@@ -1371,6 +1370,7 @@ pub const Action = union(enum) {
             .toggle_mouse_reporting,
             .toggle_command_palette,
             .toggle_background_opacity,
+            .toggle_theme,
             .show_on_screen_keyboard,
             .reset_window_size,
             .activate_key_table,

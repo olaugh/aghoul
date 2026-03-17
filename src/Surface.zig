@@ -137,6 +137,10 @@ config: DerivedConfig,
 /// is sent whenever this changes.
 config_conditional_state: configpkg.ConditionalState,
 
+/// When true, the theme was manually toggled by the user via toggle_theme
+/// and system appearance changes should not override it for this surface.
+theme_override: bool = false,
+
 /// This is set to true if our IO thread notifies us our child exited.
 /// This is used to determine if we need to confirm, hold open, etc.
 child_exited: bool = false,
@@ -5056,16 +5060,9 @@ pub fn colorSchemeCallback(self: *Surface, scheme: apprt.ColorScheme) !void {
     // If our scheme didn't change, then we don't do anything.
     if (self.config_conditional_state.theme == new_scheme) return;
 
-    // If the user has manually toggled the theme, ignore system
-    // appearance changes so we don't override their choice.
-    // Re-assert the current theme state instead.
-    if (self.app.theme_override) {
-        if (self.config_conditional_state.theme != self.app.config_conditional_state.theme) {
-            self.config_conditional_state.theme = self.app.config_conditional_state.theme;
-            self.notifyConfigConditionalState();
-        }
-        return;
-    }
+    // If the user has manually toggled the theme for this surface,
+    // ignore system appearance changes so we don't override their choice.
+    if (self.theme_override) return;
 
     // Setup our conditional state which has the current color theme.
     self.config_conditional_state.theme = new_scheme;
@@ -5786,6 +5783,17 @@ pub fn performBindingAction(self: *Surface, action: input.Binding.Action) !bool 
             .toggle_background_opacity,
             {},
         ),
+
+        .toggle_theme => {
+            // Toggle theme for THIS surface only, not all surfaces.
+            const new_theme: configpkg.ConditionalState.Theme = switch (self.config_conditional_state.theme) {
+                .light => .dark,
+                .dark => .light,
+            };
+            self.theme_override = true;
+            self.config_conditional_state.theme = new_theme;
+            self.notifyConfigConditionalState();
+        },
 
         .show_on_screen_keyboard => return try self.rt_app.performAction(
             .{ .surface = self },
