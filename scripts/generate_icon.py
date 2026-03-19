@@ -75,7 +75,7 @@ def rounded_rect_mask(size, radius, border=0):
     """Standard macOS padding and squircle shape."""
     img = Image.new("L", (size, size), 0)
     draw = ImageDraw.Draw(img)
-    std_padding = 102
+    std_padding = 20
     std_radius = 154
     border = std_padding if border == 0 else border
     radius = std_radius if radius == 0 else radius
@@ -236,7 +236,7 @@ def generate_icon():
     metal = make_brushed_metal(size)
     metal = add_patina(metal, size)
 
-    border = 102
+    border = 20
     corner_radius = 154
     plaque_mask = rounded_rect_mask(size, corner_radius, border)
 
@@ -251,8 +251,8 @@ def generate_icon():
     for c in range(3):
         canvas[:, :, c] = canvas[:, :, c] * (1 - bezel_frame_mask * 0.8) + bezel_color[c] * bezel_frame_mask * 0.8
 
-    green_outer_rect = rounded_rect_mask(size, corner_radius - 12, border + 16)
-    green_inner_rect = rounded_rect_mask(size, corner_radius - 36, border + 40)
+    green_outer_rect = rounded_rect_mask(size, corner_radius - 30, border + 77)
+    green_inner_rect = rounded_rect_mask(size, corner_radius - 51, border + 101)
     green_border_mask = np.clip(green_outer_rect - green_inner_rect, 0, 1)
 
     # Smooth perimeter-based dimming — no hard cuts, just gentle brightness waves
@@ -294,8 +294,8 @@ def generate_icon():
     )
 
     for c in range(3):
-        canvas[:, :, c] = rgb_surface[:, :, c] * plaque_mask
-    canvas[:, :, 3] = plaque_mask
+        canvas[:, :, c] = rgb_surface[:, :, c] * green_outer_rect
+    canvas[:, :, 3] = green_outer_rect
 
     canvas_output = np.clip(canvas, 0, 1)
     canvas_uint8 = (canvas_output * 255).astype(np.uint8)
