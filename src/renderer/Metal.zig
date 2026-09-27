@@ -249,8 +249,80 @@ pub fn initTarget(self: *const Metal, width: usize, height: usize) !Target {
     });
 }
 
+// MAGPIE frame capture (for recording PR videos): when GHOSTTY_MAGPIE_FRAME_DIR
+// names a directory, every presented frame is written while <dir>/recording
+// exists to <dir>/clip_NN/f_NNNNNN.rgba (BGRA, top-down rows), with
+// "NNNNNN <CLOCK_MONOTONIC seconds> width height" lines in times.txt (the
+// window can resize mid-clip) and
+// "width height bgra" in size.txt. Each time recording starts a new clip
+// directory is used. Not meant for upstream.
+const magpie_capture = struct {
+    var checked = false;
+    var dir: ?[]const u8 = null;
+    var recording = false;
+    var clip: u32 = 0;
+    var frame: u32 = 0;
+
+    fn capture(surface: *macos.iosurface.IOSurface) void {
+        if (!checked) {
+            checked = true;
+            if (std.posix.getenv("GHOSTTY_MAGPIE_FRAME_DIR")) |d| {
+                if (d.len > 0) dir = d;
+            }
+        }
+        const base = dir orelse return;
+        var path_buf: [4096]u8 = undefined;
+        const flag = std.fmt.bufPrint(&path_buf, "{s}/recording", .{base}) catch return;
+        std.fs.accessAbsolute(flag, .{}) catch {
+            recording = false;
+            return;
+        };
+        if (!recording) {
+            recording = true;
+            clip += 1;
+            frame = 0;
+            const clip_dir = std.fmt.bufPrint(&path_buf, "{s}/clip_{d:0>2}", .{ base, clip }) catch return;
+            std.fs.makeDirAbsolute(clip_dir) catch {};
+        }
+        const n = frame;
+        frame += 1;
+        const ts = std.posix.clock_gettime(.MONOTONIC) catch return;
+        const when = @as(f64, @floatFromInt(ts.sec)) + @as(f64, @floatFromInt(ts.nsec)) / 1e9;
+
+        surface.lock();
+        defer surface.unlock();
+        const width = surface.getWidth();
+        const height = surface.getHeight();
+        const row_bytes = surface.getBytesPerRow();
+        const pixels = surface.getBaseAddress() orelse return;
+
+        const frame_path = std.fmt.bufPrint(&path_buf, "{s}/clip_{d:0>2}/f_{d:0>6}.rgba", .{ base, clip, n }) catch return;
+        const file = std.fs.createFileAbsolute(frame_path, .{}) catch return;
+        defer file.close();
+        var row: usize = 0;
+        while (row < height) : (row += 1) {
+            file.writeAll(pixels[row * row_bytes ..][0 .. width * 4]) catch return;
+        }
+
+        var line_buf: [128]u8 = undefined;
+        const size_path = std.fmt.bufPrint(&path_buf, "{s}/clip_{d:0>2}/size.txt", .{ base, clip }) catch return;
+        if (std.fs.createFileAbsolute(size_path, .{})) |f| {
+            defer f.close();
+            const line = std.fmt.bufPrint(&line_buf, "{d} {d} bgra\n", .{ width, height }) catch return;
+            f.writeAll(line) catch {};
+        } else |_| {}
+        const times_path = std.fmt.bufPrint(&path_buf, "{s}/clip_{d:0>2}/times.txt", .{ base, clip }) catch return;
+        const tf = std.fs.cwd().createFile(times_path, .{ .truncate = false }) catch return;
+        defer tf.close();
+        tf.seekFromEnd(0) catch return;
+        const line = std.fmt.bufPrint(&line_buf, "{d:0>6} {d:.6} {d} {d}\n", .{ n, when, width, height }) catch return;
+        tf.writeAll(line) catch {};
+    }
+};
+
 /// Present the provided target.
 pub inline fn present(self: *Metal, target: Target, sync: bool) !void {
+    magpie_capture.capture(target.surface);
     if (sync) {
         self.layer.setSurfaceSync(target.surface);
     } else {
